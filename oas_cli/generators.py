@@ -1,10 +1,12 @@
 """File generation functions for Open Agent Spec."""
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import logging
 import json
 import openai
+from jinja2 import Template
 from behavioral_contracts import behavioral_contract
+from .utils import map_yaml_type
 
 log = logging.getLogger("oas")
 
@@ -26,11 +28,17 @@ def generate_agent_code(output: Path, spec_data: Dict[str, Any], agent_name: str
     for task_name, task_def in tasks.items():
         # Convert task name to snake_case for function name
         func_name = task_name.replace("-", "_")
-        
+
+        inputs = task_def.get("input", {})
+        outputs = task_def.get("output", {})
+
         # Generate input parameters
         input_params = []
-        for param_name, param_type in task_def.get("input", {}).items():
-            input_params.append(f"{param_name}: str")  # Force string type for now
+        for param_name, param_type in inputs.items():
+            input_params.append(f"{param_name}: {map_yaml_type(param_type)}")
+
+        # Optional runtime parameters
+        input_params.extend(["memory: str | None = None", "indicators_summary: str | None = None"])
         
         # Generate return type annotation
         output_type = "Dict[str, Any]"
@@ -38,39 +46,47 @@ def generate_agent_code(output: Path, spec_data: Dict[str, Any], agent_name: str
             output_type = "Dict[str, Any]"  # Could be made more specific based on output schema
         
         # Generate function docstring
+        param_lines = [f"        {param_name}: {param_type}" for param_name, param_type in task_def.get("input", {}).items()]
+        param_lines.append("        memory: Optional[str] = None")
+        param_lines.append("        indicators_summary: Optional[str] = None")
+
         docstring = f'''"""Process {task_name} task.
 
     Args:
-{chr(10).join(f"        {param_name}: {param_type}" for param_name, param_type in task_def.get("input", {}).items())}
+{chr(10).join(param_lines)}
 
     Returns:
         {output_type}
     """'''
         
         # Generate function code
-        output_json = json.dumps(task_def.get('output', {}))
+        output_json = json.dumps(outputs)
+
+        contract_cfg = task_def.get('contract') or {
+            "version": "1.1",
+            "description": task_def.get('description', ''),
+            "role": agent_name
+        }
+
         task_func = f'''
-@behavioral_contract({{
-    "version": "1.1",
-    "description": "{task_def.get('description', '')}",
-    "role": "{agent_name}"
-}})
+@behavioral_contract(**{json.dumps(contract_cfg)})
 def {func_name}({', '.join(input_params)}) -> {output_type}:
     {docstring}
-    # Define task_def for this function
-    task_def = {{
+
+    task_def = {
         "output": {output_json}
-    }}
-    prompt = f"""Process the following {task_name} task:
-{chr(10).join(f'{k}: {{{k}}}' for k in task_def.get('input', {}))}
+    }
 
-Provide a response in the following format, replacing <value> with actual values:
-{chr(10).join(f'{k}: <value>  # {task_def.get("output", {}).get(k, "string")}' for k in task_def.get('output', {}))}
+    template_path = Path(__file__).parent / "prompts" / "{task_name}_prompt.jinja2"
+    if not template_path.exists():
+        template_path = Path(__file__).parent / "prompts" / "agent_prompt.jinja2"
 
-Example format:
-input_field: example input  # string
-numeric_field: 42  # number
-text_field: This is a sample response  # string"""
+    template = Template(template_path.read_text())
+    prompt = template.render(
+        input={{ {', '.join(f'"{p}": {p}' for p in inputs.keys())} }},
+        memory=memory,
+        indicators_summary=indicators_summary
+    )
 
     client = openai.OpenAI(
         base_url="{spec_data['intelligence']['endpoint']}",
@@ -91,7 +107,7 @@ text_field: This is a sample response  # string"""
 
     # Parse the response into the expected output format
     output_dict = {{}}
-    output_fields = list(task_def.get('output', {{}}).keys())
+    output_fields = list(outputs.keys())
     
     # Split response into lines and process each line
     lines = result.strip().split('\\n')
@@ -137,15 +153,17 @@ text_field: This is a sample response  # string"""
         class_method = f'''
     def {func_name}(self, {', '.join(input_params)}) -> {output_type}:
         """Process {task_name} task."""
-        return {func_name}({', '.join(param.split(':')[0] for param in input_params)})
+        return {func_name}({', '.join(param.split(':')[0].split('=')[0].strip() for param in input_params)})
 '''
         class_methods.append(class_method)
 
     # Generate the complete agent code
     first_task_name = next(iter(tasks.keys())) if tasks else None
-    agent_code = f'''from typing import Dict, Any
+    agent_code = f'''from typing import Dict, Any, Optional
+from pathlib import Path
 import openai
 import json
+from jinja2 import Template
 from behavioral_contracts import behavioral_contract
 
 ROLE = "{agent_name.title()}"
@@ -253,15 +271,12 @@ def generate_env_example(output: Path) -> None:
     (output / ".env.example").write_text(env_content)
     log.info(".env.example created")
 
-def generate_prompt_template(output: Path) -> None:
-    """Generate the prompt template file."""
+def generate_prompt_template(output: Path, spec_data: Dict[str, Any]) -> None:
+    """Generate prompt template files, using custom templates when provided."""
     prompts_dir = output / "prompts"
     prompts_dir.mkdir(exist_ok=True)
-    
-    if (prompts_dir / "agent_prompt.jinja2").exists():
-        log.warning("agent_prompt.jinja2 already exists and will be overwritten")
-    
-    prompt_content = """You are a professional AI agent designed to process tasks according to the Open Agent Spec.
+
+    default_content = """You are a professional AI agent designed to process tasks according to the Open Agent Spec.
 
 TASK:
 Process the following task:
@@ -270,23 +285,24 @@ Process the following task:
 {{ key }}: {{ value }}
 {% endfor %}
 
-INSTRUCTIONS:
-1. Review the input data carefully
-2. Consider all relevant factors
-3. Provide a clear, actionable response
-4. Explain your reasoning in detail
+{% if memory %}
+MEMORY:\n{{ memory }}
+{% endif %}
 
-OUTPUT FORMAT:
-Your response should be structured as follows:
+{% if indicators_summary %}
+INDICATORS:\n{{ indicators_summary }}
+{% endif %}
 
-{% for key in output.keys() %}
-{{ key }}: <value>
-{% endfor %}
-
-CONSTRAINTS:
-- Be clear and specific
-- Focus on actionable insights
-- Maintain professional objectivity
 """
+
+    # Top-level template
+    prompt_content = spec_data.get("prompt_template", default_content)
     (prompts_dir / "agent_prompt.jinja2").write_text(prompt_content)
-    log.info("agent_prompt.jinja2 created")
+    log.info("agent_prompt.jinja2 created" + (" (custom)" if "prompt_template" in spec_data else " (default)"))
+
+    # Task-specific templates
+    for task_name, task_def in spec_data.get("tasks", {}).items():
+        if "prompt_template" in task_def:
+            file_path = prompts_dir / f"{task_name}_prompt.jinja2"
+            file_path.write_text(task_def["prompt_template"])
+            log.info(f"{file_path.name} created (custom)")

@@ -50,14 +50,14 @@ def sample_spec():
 
 def test_generate_agent_code(temp_dir, sample_spec):
     """Test that agent.py is generated correctly."""
-    generate_agent_code(temp_dir, sample_spec, "test_agent", "TestAgentAgent")
+    generate_agent_code(temp_dir, sample_spec, "test_agent", "TestAgent")
     
     agent_file = temp_dir / "agent.py"
     assert agent_file.exists()
     
     content = agent_file.read_text()
     assert "from behavioral_contracts import behavioral_contract" in content
-    assert "class TestAgentAgent:" in content
+    assert "class TestAgent:" in content
     assert "def analyze(" in content
 
 def test_generate_readme(temp_dir, sample_spec):
@@ -96,7 +96,7 @@ def test_generate_env_example(temp_dir):
 
 def test_generate_prompt_template(temp_dir):
     """Test that the prompt template is generated correctly."""
-    generate_prompt_template(temp_dir)
+    generate_prompt_template(temp_dir, sample_spec)
     
     prompt_file = temp_dir / "prompts" / "agent_prompt.jinja2"
     assert prompt_file.exists()

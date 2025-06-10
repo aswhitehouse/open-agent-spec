@@ -72,7 +72,7 @@ def generate_files(output: Path, spec_data: dict, agent_name: str, class_name: s
         generate_readme(output, spec_data)
         generate_requirements(output)
         generate_env_example(output)
-        generate_prompt_template(output)
+        generate_prompt_template(output, spec_data)
         
         console.print("\n[bold green]✅ Agent project initialized![/] ✨")
         log.info("Project initialized")
@@ -113,6 +113,15 @@ def init(
         log.info("- requirements.txt")
         log.info("- .env.example")
         log.info("- prompts/agent_prompt.jinja2")
+        if any('prompt_template' in t for t in spec_data.get('tasks', {}).values()) or 'prompt_template' in spec_data:
+            log.info("Custom prompt templates detected")
+        if any('memory' in t.get('input', {}) for t in spec_data.get('tasks', {}).values()):
+            log.info("Memory input detected")
+        if any('indicators_summary' in t.get('input', {}) for t in spec_data.get('tasks', {}).values()):
+            log.info("Indicators summary detected")
+        for name, t in spec_data.get('tasks', {}).items():
+            if 'contract' in t:
+                log.info(f"Task {name} contract: {t['contract']}")
         return
 
     generate_files(output, spec_data, agent_name, class_name, log)
@@ -150,6 +159,15 @@ def update(
         log.info("- requirements.txt")
         log.info("- .env.example")
         log.info("- prompts/agent_prompt.jinja2")
+        if any('prompt_template' in t for t in spec_data.get('tasks', {}).values()) or 'prompt_template' in spec_data:
+            log.info("Custom prompt templates detected")
+        if any('memory' in t.get('input', {}) for t in spec_data.get('tasks', {}).values()):
+            log.info("Memory input detected")
+        if any('indicators_summary' in t.get('input', {}) for t in spec_data.get('tasks', {}).values()):
+            log.info("Indicators summary detected")
+        for name, t in spec_data.get('tasks', {}).items():
+            if 'contract' in t:
+                log.info(f"Task {name} contract: {t['contract']}")
         return
 
     # Generate updated files

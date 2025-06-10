@@ -33,7 +33,7 @@ def test_valid_spec():
     
     agent_name, class_name = validate_spec(spec)
     assert agent_name == "test_agent"
-    assert class_name == "TestAgentAgent"
+    assert class_name == "TestAgent"
 
 def test_missing_required_fields():
     """Test that missing required fields raise KeyError."""
