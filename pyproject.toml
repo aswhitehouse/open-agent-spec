@@ -14,7 +14,8 @@ dependencies = [
     "typer[all]>=0.9.0",
     "pyyaml",
     "rich",
-    "behavioral-contracts"
+    "behavioral-contracts",
+    "jinja2>=3.0.0"
 ]
 
 [project.scripts]
