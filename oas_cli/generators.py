@@ -198,6 +198,13 @@ def generate_readme(output: Path, spec_data: Dict[str, Any]) -> None:
             task_docs.append(f"- {param_name}: {param_type}")
         task_docs.append("")
     
+    first_task = next(iter(spec_data.get("tasks", {}).keys()), None)
+    example_inputs = ""
+    if first_task:
+        example_inputs = ", ".join(
+            f"{k}=\"example_{k}\"" for k in spec_data["tasks"][first_task].get("input", {})
+        )
+
     readme_content = f"""# {spec_data['info']['name'].title().replace('-', ' ')}
 
 {spec_data['info']['description']}
@@ -221,10 +228,10 @@ from agent import {spec_data['info']['name'].title().replace('-', '')}Agent
 
 agent = {spec_data['info']['name'].title().replace('-', '')}Agent()
 # Example usage
-task_name = "{next(iter(spec_data.get('tasks', {}).keys()), '')}"
+task_name = "{first_task or ''}"
 if task_name:
     result = getattr(agent, task_name.replace("-", "_"))(
-        {', '.join(f'{k}="example_{k}"' for k in spec_data['tasks'][task_name].get('input', {}))}
+        {example_inputs}
     )
     print(result)
 ```
