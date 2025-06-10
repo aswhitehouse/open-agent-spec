@@ -1,5 +1,65 @@
 """Validation functions for Open Agent Spec."""
-from typing import Tuple
+from typing import Tuple, Dict, Any
+
+def validate_task(task_name: str, task_def: Dict[str, Any]) -> None:
+    """Validate a task definition.
+    
+    Args:
+        task_name: Name of the task
+        task_def: Task definition dictionary
+        
+    Raises:
+        KeyError: If required fields are missing
+        ValueError: If field types are invalid
+    """
+    if "description" not in task_def:
+        raise KeyError(f"Missing required field: tasks.{task_name}.description")
+    if not isinstance(task_def["description"], str):
+        raise ValueError(f"tasks.{task_name}.description must be a string")
+        
+    # Validate input/output if present
+    if "input" in task_def:
+        if not isinstance(task_def["input"], dict):
+            raise ValueError(f"tasks.{task_name}.input must be a dictionary")
+        for param_name, param_type in task_def["input"].items():
+            if not isinstance(param_type, str):
+                raise ValueError(f"tasks.{task_name}.input.{param_name} type must be a string")
+                
+    if "output" in task_def:
+        if not isinstance(task_def["output"], dict):
+            raise ValueError(f"tasks.{task_name}.output must be a dictionary")
+        for param_name, param_type in task_def["output"].items():
+            if not isinstance(param_type, str):
+                raise ValueError(f"tasks.{task_name}.output.{param_name} type must be a string")
+                
+    # Validate prompt template if present
+    if "prompt_template" in task_def:
+        if not isinstance(task_def["prompt_template"], str):
+            raise ValueError(f"tasks.{task_name}.prompt_template must be a string")
+
+def validate_intelligence_config(config: Dict[str, Any]) -> None:
+    """Validate intelligence configuration.
+    
+    Args:
+        config: Intelligence configuration dictionary
+        
+    Raises:
+        ValueError: If config values are invalid
+    """
+    if not isinstance(config, dict):
+        raise ValueError("intelligence.config must be a dictionary")
+        
+    if "temperature" in config:
+        if not isinstance(config["temperature"], (int, float)):
+            raise ValueError("intelligence.config.temperature must be a number")
+        if not 0 <= config["temperature"] <= 2:
+            raise ValueError("intelligence.config.temperature must be between 0 and 2")
+            
+    if "max_tokens" in config:
+        if not isinstance(config["max_tokens"], int):
+            raise ValueError("intelligence.config.max_tokens must be an integer")
+        if config["max_tokens"] <= 0:
+            raise ValueError("intelligence.config.max_tokens must be positive")
 
 def validate_spec(spec_data: dict) -> Tuple[str, str]:
     """Validate the Open Agent Spec structure and return agent name and class name.
@@ -47,8 +107,21 @@ def validate_spec(spec_data: dict) -> Tuple[str, str]:
             raise ValueError("intelligence.endpoint must be a string")
         if not isinstance(intelligence["model"], str):
             raise ValueError("intelligence.model must be a string")
-        if not isinstance(intelligence["config"], dict):
-            raise ValueError("intelligence.config must be a dictionary")
+            
+        # Validate intelligence config
+        validate_intelligence_config(intelligence["config"])
+            
+        # Validate tasks if present
+        if "tasks" in spec_data:
+            if not isinstance(spec_data["tasks"], dict):
+                raise ValueError("tasks must be a dictionary")
+            for task_name, task_def in spec_data["tasks"].items():
+                validate_task(task_name, task_def)
+                
+        # Validate top-level prompt template if present
+        if "prompt_template" in spec_data:
+            if not isinstance(spec_data["prompt_template"], str):
+                raise ValueError("prompt_template must be a string")
             
         agent_name = info["name"].replace("-", "_")
 

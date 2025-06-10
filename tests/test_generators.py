@@ -94,7 +94,7 @@ def test_generate_env_example(temp_dir):
     content = env_file.read_text()
     assert "OPENAI_API_KEY=" in content
 
-def test_generate_prompt_template(temp_dir):
+def test_generate_prompt_template(temp_dir, sample_spec):
     """Test that the prompt template is generated correctly."""
     generate_prompt_template(temp_dir, sample_spec)
     
@@ -104,4 +104,47 @@ def test_generate_prompt_template(temp_dir):
     content = prompt_file.read_text()
     assert "You are a professional AI agent" in content
     assert "TASK:" in content
-    assert "INSTRUCTIONS:" in content 
+    assert "INSTRUCTIONS:" in content
+
+def test_generate_custom_prompt_template(temp_dir):
+    """Test that custom prompt templates are generated correctly."""
+    spec = {
+        "info": {
+            "name": "test-agent",
+            "description": "A test agent"
+        },
+        "intelligence": {
+            "endpoint": "https://api.openai.com/v1",
+            "model": "gpt-4",
+            "config": {
+                "temperature": 0.7,
+                "max_tokens": 1000
+            }
+        },
+        "prompt_template": "Custom template content",
+        "tasks": {
+            "analyze": {
+                "description": "Analyze the given input",
+                "input": {
+                    "text": "string"
+                },
+                "output": {
+                    "summary": "string",
+                    "key_points": "string"
+                },
+                "prompt_template": "Custom task template content"
+            }
+        }
+    }
+    
+    generate_prompt_template(temp_dir, spec)
+    
+    # Check default template
+    default_template = temp_dir / "prompts" / "agent_prompt.jinja2"
+    assert default_template.exists()
+    assert "Custom template content" in default_template.read_text()
+    
+    # Check task-specific template
+    task_template = temp_dir / "prompts" / "analyze_prompt.jinja2"
+    assert task_template.exists()
+    assert "Custom task template content" in task_template.read_text() 
