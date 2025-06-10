@@ -69,132 +69,112 @@ def generate_agent_code(output: Path, spec_data: Dict[str, Any], agent_name: str
         }
 
         task_func = f'''
-@behavioral_contract(**{json.dumps(contract_cfg)})
-def {func_name}({', '.join(input_params)}) -> {output_type}:
-    {docstring}
+    @behavioral_contract(**{json.dumps(contract_cfg)})
+    def {func_name}({', '.join(input_params)}) -> {output_type}:
+        {docstring}
 
-    task_def = {
-        "output": {output_json}
-    }
+        task_def = {{
+            "output": {output_json}
+        }}
 
-    template_path = Path(__file__).parent / "prompts" / "{task_name}_prompt.jinja2"
-    if not template_path.exists():
-        template_path = Path(__file__).parent / "prompts" / "agent_prompt.jinja2"
+        template_path = Path(__file__).parent / "prompts" / "{task_name}_prompt.jinja2"
+        if not template_path.exists():
+            template_path = Path(__file__).parent / "prompts" / "agent_prompt.jinja2"
 
-    template = Template(template_path.read_text())
-    prompt = template.render(
-        input={{ {', '.join(f'"{p}": {p}' for p in inputs.keys())} }},
-        memory=memory,
-        indicators_summary=indicators_summary
-    )
+        template = Template(template_path.read_text())
+        prompt = template.render(
+            input={{ {', '.join(f'"{p}": {p}' for p in inputs.keys())} }},
+            memory=memory,
+            indicators_summary=indicators_summary
+        )
 
-    client = openai.OpenAI(
-        base_url="{spec_data['intelligence']['endpoint']}",
-        api_key=openai.api_key
-    )
+        client = openai.OpenAI(
+            base_url="{spec_data['intelligence']['endpoint']}",
+            api_key=openai.api_key
+        )
 
-    response = client.chat.completions.create(
-        model="{spec_data['intelligence']['model']}",
-        messages=[
-            {{"role": "system", "content": "You are a professional {agent_name}."}},
-            {{"role": "user", "content": prompt}}
-        ],
-        temperature={spec_data['intelligence']['config']['temperature']},
-        max_tokens={spec_data['intelligence']['config']['max_tokens']}
-    )
-    
-    result = response.choices[0].message.content
-
-    # Parse the response into the expected output format
-    output_dict = {{}}
-    output_fields = list(outputs.keys())
-    
-    # Split response into lines and process each line
-    lines = result.strip().split('\\n')
-    current_key = None
-    current_value = []
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-            
-        # Check if this line starts a new field
-        for key in output_fields:
-            if line.startswith(key + ":"):
-                # Save previous field if exists
-                if current_key and current_value:
-                    output_dict[current_key] = ' '.join(current_value).strip()
-                # Start new field
-                current_key = key
-                current_value = [line[len(key)+1:].strip()]
-                break
-        else:
-            # If no new field found, append to current value
-            if current_key:
-                current_value.append(line)
-    
-    # Save the last field
-    if current_key and current_value:
-        output_dict[current_key] = ' '.join(current_value).strip()
-    
-    # Validate all required fields are present
-    missing_fields = [field for field in output_fields if field not in output_dict]
-    if missing_fields:
-        print(f"Warning: Missing output fields: {{missing_fields}}")
-        for field in missing_fields:
-            output_dict[field] = ""  # Provide empty string for missing fields
-    
-    return output_dict
-'''
-        task_functions.append(task_func)
+        response = client.chat.completions.create(
+            model="{spec_data['intelligence']['model']}",
+            messages=[
+                {{"role": "system", "content": "You are a professional {agent_name}."}},
+                {{"role": "user", "content": prompt}}
+            ],
+            temperature={spec_data['intelligence']['config']['temperature']},
+            max_tokens={spec_data['intelligence']['config']['max_tokens']}
+        )
         
-        # Generate corresponding class method
-        class_method = f'''
-    def {func_name}(self, {', '.join(input_params)}) -> {output_type}:
-        """Process {task_name} task."""
-        return {func_name}({', '.join(param.split(':')[0].split('=')[0].strip() for param in input_params)})
-'''
-        class_methods.append(class_method)
+        result = response.choices[0].message.content
 
-    # Generate the complete agent code
-    first_task_name = next(iter(tasks.keys())) if tasks else None
-    agent_code = f'''from typing import Dict, Any, Optional
-from pathlib import Path
-import openai
+        # Parse the response into the expected output format
+        output_dict = {{}}
+        output_fields = list(outputs.keys())
+        
+        # Split response into lines and process each line
+        lines = result.strip().split('\\n')
+        current_key = None
+        current_value = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Check if this line starts a new field
+            for key in output_fields:
+                if line.startswith(key + ":"):
+                    # Save previous field if exists
+                    if current_key and current_value:
+                        output_dict[current_key] = ' '.join(current_value).strip()
+                    # Start new field
+                    current_key = key
+                    current_value = [line[len(key)+1:].strip()]
+                    break
+            else:
+                # If no new field found, append to current value
+                if current_key:
+                    current_value.append(line)
+        
+        # Save the last field
+        if current_key and current_value:
+            output_dict[current_key] = ' '.join(current_value).strip()
+        
+        # Validate all required fields are present
+        missing_fields = [field for field in output_fields if field not in output_dict]
+        if missing_fields:
+            print(f"Warning: Missing output fields: {{missing_fields}}")
+            for field in missing_fields:
+                output_dict[field] = ""  # Provide empty string for missing fields
+        
+        return output_dict
+    '''
+        task_functions.append(task_func)
+        class_methods.append(f"    {func_name} = {func_name}")
+
+    # Generate the complete file content
+    file_content = f'''"""Generated agent implementation."""
+import os
 import json
+from pathlib import Path
+from typing import Dict, Any, Optional
+import openai
+from dotenv import load_dotenv
 from jinja2 import Template
 from behavioral_contracts import behavioral_contract
 
-ROLE = "{agent_name.title()}"
+# Load environment variables
+load_dotenv()
 
 {chr(10).join(task_functions)}
 
 class {class_name}:
-    def __init__(self, api_key: str | None = None):
-        self.model = "{spec_data['intelligence']['model']}"
-        if api_key:
-            openai.api_key = api_key
+    """{spec_data['info']['description']}"""
 
 {chr(10).join(class_methods)}
-
-def main():
-    agent = {class_name}()
-    # Example usage
-    if "{first_task_name}":
-        result = getattr(agent, "{first_task_name}".replace("-", "_"))(
-            {', '.join(f'{k}="example_{k}"' for k in tasks[first_task_name].get('input', {}))}
-        )
-        print(json.dumps(result, indent=2))
-    else:
-        print("No tasks defined in the spec file")
-
-if __name__ == "__main__":
-    main()
 '''
-    (output / "agent.py").write_text(agent_code)
+
+    # Write the file
+    (output / "agent.py").write_text(file_content)
     log.info("agent.py created")
-    log.debug(f"Agent class name generated: {class_name}")
 
 def generate_readme(output: Path, spec_data: Dict[str, Any]) -> None:
     """Generate the README.md file."""

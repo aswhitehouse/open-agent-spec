@@ -104,7 +104,10 @@ def test_generate_prompt_template(temp_dir, sample_spec):
     content = prompt_file.read_text()
     assert "You are a professional AI agent" in content
     assert "TASK:" in content
-    assert "INSTRUCTIONS:" in content
+    assert "Process the following task:" in content
+    assert "{% for key, value in input.items() %}" in content
+    assert "{% if memory %}" in content
+    assert "{% if indicators_summary %}" in content
 
 def test_generate_custom_prompt_template(temp_dir):
     """Test that custom prompt templates are generated correctly."""
