@@ -133,7 +133,9 @@ def update(
 
     # Check if output directory exists
     if not output.exists():
-        log.error(f"Output directory {output} does not exist. Use 'oas init' to create a new agent.")
+        error_msg = f"Output directory {output} does not exist. Use 'oas init' to create a new agent."
+        log.error(error_msg)
+        console.print(f"[red]Error: {error_msg}[/]")
         raise typer.Exit(1)
 
     spec_data, agent_name, class_name = load_and_validate_spec(spec, log)

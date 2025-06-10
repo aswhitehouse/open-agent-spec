@@ -15,21 +15,39 @@ def validate_spec(spec_data: dict) -> Tuple[str, str]:
         ValueError: If field types are invalid
     """
     try:
+        # Check required fields first
+        if "info" not in spec_data:
+            raise KeyError("Missing required field: info")
+        if "intelligence" not in spec_data:
+            raise KeyError("Missing required field: intelligence")
+            
         info = spec_data["info"]
         intelligence = spec_data["intelligence"]
         
-        # Validate info fields
-        if not isinstance(info.get("name"), str):
-            raise ValueError("info.name must be a string")
-        if not isinstance(info.get("description"), str):
-            raise ValueError("info.description must be a string")
+        # Check required info fields
+        if "name" not in info:
+            raise KeyError("Missing required field: info.name")
+        if "description" not in info:
+            raise KeyError("Missing required field: info.description")
             
-        # Validate intelligence fields
-        if not isinstance(intelligence.get("endpoint"), str):
+        # Check required intelligence fields
+        if "endpoint" not in intelligence:
+            raise KeyError("Missing required field: intelligence.endpoint")
+        if "model" not in intelligence:
+            raise KeyError("Missing required field: intelligence.model")
+        if "config" not in intelligence:
+            raise KeyError("Missing required field: intelligence.config")
+            
+        # Validate field types
+        if not isinstance(info["name"], str):
+            raise ValueError("info.name must be a string")
+        if not isinstance(info["description"], str):
+            raise ValueError("info.description must be a string")
+        if not isinstance(intelligence["endpoint"], str):
             raise ValueError("intelligence.endpoint must be a string")
-        if not isinstance(intelligence.get("model"), str):
+        if not isinstance(intelligence["model"], str):
             raise ValueError("intelligence.model must be a string")
-        if not isinstance(intelligence.get("config"), dict):
+        if not isinstance(intelligence["config"], dict):
             raise ValueError("intelligence.config must be a dictionary")
             
         agent_name = info["name"].replace("-", "_")

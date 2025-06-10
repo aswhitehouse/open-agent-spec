@@ -25,3 +25,14 @@ packages = ["oas_cli"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=oas_cli"
