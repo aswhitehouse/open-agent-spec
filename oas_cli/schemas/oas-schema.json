@@ -309,7 +309,39 @@
         ]
       },
       "behavioural_contract": {
-        "type": "object"
+        "type": "object",
+        "description": "Behavioural contract configuration. See behavioural-contracts library for full schema and enforcement.",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Version of the behavioural contract"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the behavioural contract"
+          },
+          "behavioural_flags": {
+            "type": "object",
+            "description": "Behavioural flags configuration (conservatism, verbosity, temperature_control)"
+          },
+          "response_contract": {
+            "type": "object",
+            "description": "Response contract configuration"
+          },
+          "policy": {
+            "type": "object",
+            "description": "Policy configuration (optional)"
+          },
+          "health": {
+            "type": "object",
+            "description": "Health monitoring configuration (optional)"
+          },
+          "escalation": {
+            "type": "object",
+            "description": "Escalation configuration (optional)"
+          }
+        },
+        "additionalProperties": true
       },
       "interface": {
         "type": "object"
